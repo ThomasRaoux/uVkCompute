@@ -41,14 +41,12 @@ struct ShaderCode {
 };
 
 static ShaderCode kShaderCodeCases[] = {
-    {"1x64", TILE_M_1_TILE_N_64, sizeof(TILE_M_1_TILE_N_64), 1, 64},
-    {"2x64", TILE_M_2_TILE_N_64, sizeof(TILE_M_2_TILE_N_64), 2, 64},
     {"4x64", TILE_M_4_TILE_N_64, sizeof(TILE_M_4_TILE_N_64), 4, 64},
     {"8x64", TILE_M_8_TILE_N_64, sizeof(TILE_M_8_TILE_N_64), 8, 64},
-    {"1x128", TILE_M_1_TILE_N_128, sizeof(TILE_M_1_TILE_N_128), 1, 128},
-    {"2x128", TILE_M_2_TILE_N_128, sizeof(TILE_M_2_TILE_N_128), 2, 128},
+  //  {"12x64", TILE_M_12_TILE_N_64, sizeof(TILE_M_12_TILE_N_64), 12, 64},
     {"4x128", TILE_M_4_TILE_N_128, sizeof(TILE_M_4_TILE_N_128), 4, 128},
     {"8x128", TILE_M_8_TILE_N_128, sizeof(TILE_M_8_TILE_N_128), 8, 128},
+  //  {"12x128", TILE_M_12_TILE_N_128, sizeof(TILE_M_12_TILE_N_128), 12, 128},
 };
 
 static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,

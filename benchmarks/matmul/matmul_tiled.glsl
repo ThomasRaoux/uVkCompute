@@ -2,6 +2,7 @@
 #pragma use_vulkan_memory_model
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_buffer_reference : enable
+#extension GL_KHR_shader_subgroup_shuffle : enable
 #extension GL_EXT_control_flow_attributes : enable
 
 layout(binding=0) buffer InputA { vec4 x[]; } inputA;
@@ -17,7 +18,7 @@ const uint strideA = K;
 const uint strideB = N;
 const uint strideC = N;
 
-const uint C_ROWS = TILE_M / 1;
+const uint C_ROWS = TILE_M;
 const uint C_COLS = TILE_N / 64;
 
 uint coordToOffset(uint i, uint j, uint stride)
@@ -31,7 +32,7 @@ void main()
     uint laneId = gl_LocalInvocationID.x;
     uvec2 tileID = uvec2(gl_GlobalInvocationID.xy);
     vec4 C[C_ROWS][C_COLS];
-    vec4 A[C_ROWS];
+    vec4 A[C_ROWS/4];
 
     // Initialize result to zero
     [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
@@ -40,47 +41,52 @@ void main()
         }
     }
 
-    for (uint k = 0; k < K; k+=4) {
-        [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
-            uint gi = tileID.y*C_ROWS+i;
-            uint gk = k/4;
+    [[unroll]]for (uint k = 0; k < K; k+=16) {
+        [[unroll]] for (uint i = 0; i < C_ROWS/4; ++i) {
+            uint gi = tileID.y*C_ROWS+i*4 + laneId/4;
+            uint gk = k/4 + (laneId % 4);
             A[i] = inputA.x[coordToOffset(gi, gk, strideA/4)];
         }
 
+     [[unroll]]   for (uint kk = 0; kk < 4; ++kk) {
         [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
           uint gj = gID * (TILE_N / 4) + laneId +j*16;
-          uint gk = k;
+          uint gk = k+kk*4;
           vec4 B = inputB.x[coordToOffset(gk, gj, strideB/4)];
           [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
-            C[i][j] += vec4(A[i].x, A[i].x, A[i].x, A[i].x)*B;
+            float a = subgroupShuffle(A[i/4].x, (i%4)*4+kk);
+            C[i][j] += vec4(a, a, a, a)*B;
           }
         }
 
         [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
           uint gj = gID * (TILE_N / 4) + laneId +j*16;
-          uint gk = k+1;
+          uint gk = k+kk*4+1;
           vec4 B = inputB.x[coordToOffset(gk, gj, strideB/4)];
           [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
-            C[i][j] += vec4(A[i].y, A[i].y, A[i].y, A[i].y)*B;
+            float a = subgroupShuffle(A[i/4].y, (i%4)*4+kk);
+            C[i][j] += vec4(a, a, a, a)*B;
           }
         }
 
         [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
           uint gj = gID * (TILE_N / 4) + laneId +j*16;
-          uint gk = k+2;
+          uint gk = k+kk*4+2;
           vec4 B = inputB.x[coordToOffset(gk, gj, strideB/4)];
           [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
-            C[i][j] += vec4(A[i].z, A[i].z, A[i].z, A[i].z)*B;
+            float a = subgroupShuffle(A[i/4].z, (i%4)*4+kk);
+            C[i][j] += vec4(a, a, a, a)*B;
           }
         }
-
         [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
           uint gj = gID * (TILE_N / 4) + laneId +j*16;
-          uint gk = k+3;
+          uint gk = k+kk*4+3;
           vec4 B = inputB.x[coordToOffset(gk, gj, strideB/4)];
           [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
-            C[i][j] += vec4(A[i].w, A[i].w, A[i].w, A[i].w)*B;
+            float a = subgroupShuffle(A[i/4].w, (i%4)*4+kk);
+            C[i][j] += vec4(a, a, a, a)*B;
           }
+        }
         }
     }
 
