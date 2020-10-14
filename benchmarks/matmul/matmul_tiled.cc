@@ -41,12 +41,20 @@ struct ShaderCode {
 };
 
 static ShaderCode kShaderCodeCases[] = {
+    {"4x16", TILE_M_4_TILE_N_16, sizeof(TILE_M_4_TILE_N_16), 4, 16},
+    {"8x16", TILE_M_8_TILE_N_16, sizeof(TILE_M_8_TILE_N_16), 8, 16},
+   // {"12x16", TILE_M_12_TILE_N_16, sizeof(TILE_M_12_TILE_N_16), 12, 16},
+    {"16x16", TILE_M_16_TILE_N_16, sizeof(TILE_M_16_TILE_N_16), 16, 16},
+    
+    {"4x32", TILE_M_4_TILE_N_32, sizeof(TILE_M_4_TILE_N_32), 4, 32},
+    {"8x32", TILE_M_8_TILE_N_32, sizeof(TILE_M_8_TILE_N_32), 8, 32},
+   // {"12x32", TILE_M_12_TILE_N_32, sizeof(TILE_M_12_TILE_N_32), 12, 32},
+    {"16x32", TILE_M_16_TILE_N_32, sizeof(TILE_M_16_TILE_N_32), 16, 32},
+
     {"4x64", TILE_M_4_TILE_N_64, sizeof(TILE_M_4_TILE_N_64), 4, 64},
     {"8x64", TILE_M_8_TILE_N_64, sizeof(TILE_M_8_TILE_N_64), 8, 64},
-  //  {"12x64", TILE_M_12_TILE_N_64, sizeof(TILE_M_12_TILE_N_64), 12, 64},
-    {"4x128", TILE_M_4_TILE_N_128, sizeof(TILE_M_4_TILE_N_128), 4, 128},
-    {"8x128", TILE_M_8_TILE_N_128, sizeof(TILE_M_8_TILE_N_128), 8, 128},
-  //  {"12x128", TILE_M_12_TILE_N_128, sizeof(TILE_M_12_TILE_N_128), 12, 128},
+   // {"12x64", TILE_M_12_TILE_N_64, sizeof(TILE_M_12_TILE_N_64), 12, 64},
+    {"16x64", TILE_M_16_TILE_N_64, sizeof(TILE_M_16_TILE_N_64), 16, 64},
 };
 
 static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,
