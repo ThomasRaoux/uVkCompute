@@ -45,7 +45,7 @@ struct ShaderCode {
 
 // clang-format off
 static ShaderCode kShaderCodeCases[] = {
-  SHADER_TILE(1, 64)
+/*  SHADER_TILE(1, 64)
   SHADER_TILE(2, 64)
   SHADER_TILE(3, 64)
   SHADER_TILE(4, 64)
@@ -56,13 +56,64 @@ static ShaderCode kShaderCodeCases[] = {
   SHADER_TILE(9, 64)
   SHADER_TILE(10, 64)
   SHADER_TILE(11, 64)
-  SHADER_TILE(12, 64)
+  SHADER_TILE(12, 64)*/
   SHADER_TILE(1, 128)
   SHADER_TILE(2, 128)
   SHADER_TILE(4, 128)
   SHADER_TILE(8, 128)
 };
 // clang-format on
+
+// Class to emulate half float on CPU.
+class fp16 {
+ public:
+  fp16(uint16_t v) { value = v; }
+  void fromFloat(const float &x) {
+    uint32_t asInt = *(uint32_t *)&x;
+    int sign = (asInt & 0x80000000) >> 31;
+    int exp = ((asInt & 0x7f800000) >> 23) - 127 + 15;
+    int mantissa = (asInt & 0x7FFFFF);
+    if (exp > 31) exp = 31;
+    if (exp < 0) exp = 0;
+    sign = sign << 15;
+    exp = exp << 10;
+    mantissa = mantissa >> (23 - 10);
+    asInt = sign | exp | mantissa;
+    value = asInt;
+  }
+  fp16(const float &x) { fromFloat(x); }
+  fp16 &operator=(const float &x) {
+    fromFloat(x);
+    return *this;
+  }
+  fp16 &operator=(const int &x) {
+    fromFloat((float)x);
+    return *this;
+  }
+  fp16 &operator+=(const fp16 &x) {
+    fromFloat(toFloat() + x.toFloat());
+    return *this;
+  }
+  float toFloat() const {
+    uint32_t asInt = value;
+    int sign = (asInt & 0x8000) >> 15;
+    int exp = ((asInt & 0x7c00) >> 10);
+    int mantissa = (asInt & 0x3FF);
+    sign = sign << 31;
+    if (exp > 0) {
+      exp = (exp + 127 - 15) << 23;
+      mantissa = mantissa << (23 - 10);
+    } else {
+      mantissa = 0;
+    }
+    asInt = sign | exp | mantissa;
+    return *(float *)&asInt;
+  }
+  operator float() { return toFloat(); }
+  uint16_t getValue() { return value; }
+ private:
+  uint16_t value;
+};
 
 static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,
                    const ::uvkc::benchmark::LatencyMeasure *latency_measure,
@@ -98,9 +149,9 @@ static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,
   //===-------------------------------------------------------------------===/
   // Create buffers
   //===-------------------------------------------------------------------===/
-  const size_t src0_size = M * K * sizeof(float);
-  const size_t src1_size = K * N * sizeof(float);
-  const size_t dst_size = M * N * sizeof(float);
+  const size_t src0_size = M * K * 2;//sizeof();
+  const size_t src1_size = K * N * 2;//sizeof(float);
+  const size_t dst_size = M * N * 2;//sizeof(float);
 
   BM_CHECK_OK_AND_ASSIGN(
       auto src0_buffer,
@@ -122,29 +173,29 @@ static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,
   // Set source buffer data
   //===-------------------------------------------------------------------===/
   auto getSrc0 = [](int i, int j) {
-    float v = float(i % 17) * 0.5f + float(j % 13) * 0.75f;
+    float v = float(i % 5) * 0.5f + float(j % 3) * 0.75f;
     return v;
   };
   auto getSrc1 = [](int i, int j) {
-    float v = float(i % 21) * 0.25f + float(j % 7) * 1.75f;
+    float v = float(i % 7) * 0.25f + float(j % 3) * 1.75f;
     return v;
   };
   BM_CHECK_OK(::uvkc::benchmark::SetDeviceBufferViaStagingBuffer(
       device, src0_buffer.get(), src0_size, [&](void *ptr, size_t num_bytes) {
-        float *src_float_buffer = reinterpret_cast<float *>(ptr);
+        uint16_t *src_float_buffer = reinterpret_cast<uint16_t *>(ptr);
         for (int i = 0; i < M; i++) {
           for (int j = 0; j < K; j++) {
-            src_float_buffer[j + i * K] = getSrc0(i, j);
+            src_float_buffer[j + i * K] = fp16(getSrc0(i, j)).getValue();
           }
         }
       }));
 
   BM_CHECK_OK(::uvkc::benchmark::SetDeviceBufferViaStagingBuffer(
       device, src1_buffer.get(), src1_size, [&](void *ptr, size_t num_bytes) {
-        float *src_float_buffer = reinterpret_cast<float *>(ptr);
+        uint16_t *src_float_buffer = reinterpret_cast<uint16_t *>(ptr);
         for (int i = 0; i < K; i++) {
           for (int j = 0; j < N; j++) {
-            src_float_buffer[j + i * N] = getSrc1(i, j);
+            src_float_buffer[j + i * N] = fp16(getSrc1(i, j)).getValue();
           }
         }
       }));
@@ -190,17 +241,18 @@ static void MatMul(::benchmark::State &state, ::uvkc::vulkan::Device *device,
 
   BM_CHECK_OK(::uvkc::benchmark::GetDeviceBufferViaStagingBuffer(
       device, dst_buffer.get(), dst_size, [&](void *ptr, size_t num_bytes) {
-        float *dst_float_buffer = reinterpret_cast<float *>(ptr);
+        uint16_t *dst_float_buffer = reinterpret_cast<uint16_t *>(ptr);
         for (int i = 0; i < M; i++) {
           for (int j = 0; j < N; j++) {
             float acc = 0.f;
             for (int k = 0; k < K; k++) {
               acc += getSrc0(i, k) * getSrc1(k, j);
             }
-            BM_CHECK_EQ(dst_float_buffer[j + i * N], acc)
+            float gpuValue = fp16(dst_float_buffer[j + i * N]).toFloat();
+            BM_CHECK_EQ(gpuValue, acc)
                 << "destination buffer element (" << i << "," << j << ")"
                 << " has incorrect value: expected to be " << acc
-                << " but found " << dst_float_buffer[j + i * N];
+                << " but found " << gpuValue;
           }
         }
       }));
