@@ -177,6 +177,11 @@ void CommandBuffer::BindPipelineAndDescriptorSets(
   }
 }
 
+void CommandBuffer::BindPipeline(const Pipeline &pipeline) {
+  symbols_.vkCmdBindPipeline(command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
+                             pipeline.pipeline());
+}
+
 void CommandBuffer::ResetQueryPool(const TimestampQueryPool &query_pool) {
   symbols_.vkCmdResetQueryPool(command_buffer_, query_pool.query_pool(),
                                /*firstQuery=*/0,

@@ -18,7 +18,7 @@ uvkc_glsl_shader_permutation(
   SRC
     "matmul_tiled.glsl"
   PERMUTATION
-    "TILE_M=[2|4|8|16|32]"
+    "TILE_M=[1|2|3|4|5|6|7|8|16|32]"
     "TILE_N=[64|128]"
     "TILE_K=[4|8]"
 )
@@ -29,10 +29,17 @@ uvkc_glsl_shader_permutation(
   SRC
     "matmul_tiled_fp16.glsl"
   PERMUTATION
-    "TILE_M=[2|4|8|16|32]"
+    "TILE_M=[2|4|6|8|9|10|11|12|13|14|15|16|32]"
     "TILE_N=[64|128]"
     "TILE_K=[4|8]"
     "TEXTURE=[1|0]"
+)
+
+uvkc_glsl_shader_instance(
+  NAME
+    border_shader
+  SRC
+    "border.glsl"
 )
 
 uvkc_cc_binary(
@@ -43,6 +50,7 @@ uvkc_cc_binary(
   DEPS
     ::matmul_tiled_shader
     ::matmul_tiled_shader_f16
+    ::border_shader
     benchmark::benchmark
     uvkc::benchmark::fp16_util
     uvkc::benchmark::main

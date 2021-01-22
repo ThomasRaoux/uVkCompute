@@ -44,16 +44,18 @@ void main()
             C[i][j] = f16vec4(0.f, 0.f, 0.f, 0.f);
         }
     }
-
-    for (uint k = 0; k < K; k+=TILE_K) {
+    uint k = 0;
+    for (; k <= K-TILE_K; k+=TILE_K) {
        [[unroll]] for (uint j = 0; j < C_COLS; j+=2) {
           [[unroll]] for (uint i = 0; i < TILE_K; ++i) {
             uint gj = gID.x * TILE_N/4 + laneId.x*2 + j*sX;
             uint gk = k+i;
+            vec4 temp;
           #if (TEXTURE == 1)
-            vec4 temp = texelFetch(texB, ivec2(gj/2, gk), 0);
+            temp = texelFetch(texB, ivec2(gj/2, gk), 0);
           #else
-            vec4 temp = inputB.x[coordToOffset(gk, gj/2, strideB/8)];
+            uint offset = coordToOffset(gk, gj/2, strideB/8);
+            temp = inputB.x[offset];
           #endif
             B[i][j].x = unpackFloat2x16(floatBitsToUint(temp.x)).x;
             B[i][j].y = unpackFloat2x16(floatBitsToUint(temp.x)).y;
@@ -70,7 +72,9 @@ void main()
           uint gi = gID.y * TILE_M + laneId.y + i*sY;
           uint gk = k/4;
           [[unroll]] for (uint kk = 0; kk < TILE_K/4; kk++) {
-            vec2 temp = inputA.x[coordToOffset(gi, gk+kk, strideA/4)];
+          vec2 temp;
+          uint offset = coordToOffset(gi, gk+kk, strideA/4);
+          temp = inputA.x[offset];
             float16_t a;
             [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
               a = unpackFloat2x16(floatBitsToUint(temp.x)).x;
@@ -86,6 +90,52 @@ void main()
         }
     }
 
+    if (k < K) {
+      f16vec4 Bedge[C_COLS];
+       [[unroll]] for (uint j = 0; j < C_COLS; j+=2) {
+            uint gj = gID.x * TILE_N/4 + laneId.x*2 + j*sX;
+            uint gk = k;
+            vec4 temp;
+          #if (TEXTURE == 1)
+            temp = texelFetch(texB, ivec2(gj/2, gk), 0);
+          #else
+            uint offset = coordToOffset(gk, gj/2, strideB/8);
+            temp = inputB.x[offset];
+          #endif
+            temp.y = (k + 1 < K) ? temp.y : 0.f;
+            temp.z = (k + 2 < K) ? temp.z : 0.f;
+            temp.w = 0.f;
+            
+            Bedge[j].x = unpackFloat2x16(floatBitsToUint(temp.x)).x;
+            Bedge[j].y = unpackFloat2x16(floatBitsToUint(temp.x)).y;
+            Bedge[j].z = unpackFloat2x16(floatBitsToUint(temp.y)).x;
+            Bedge[j].w = unpackFloat2x16(floatBitsToUint(temp.y)).y;
+            Bedge[j+1].x = unpackFloat2x16(floatBitsToUint(temp.z)).x;
+            Bedge[j+1].y = unpackFloat2x16(floatBitsToUint(temp.z)).y;
+            Bedge[j+1].z = float16_t(0.f);//unpackFloat2x16(floatBitsToUint(temp.w)).x;
+            Bedge[j+1].w = float16_t(0.f);//unpackFloat2x16(floatBitsToUint(temp.w)).y;
+          }
+
+        [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
+          uint gi = gID.y * TILE_M + laneId.y + i*sY;
+          uint gk = k/4;
+          vec2 temp;
+          uint offset = coordToOffset(gi, gk, strideA/4);
+          temp = inputA.x[offset];
+            float16_t a;
+            [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
+              a = unpackFloat2x16(floatBitsToUint(temp.x)).x;
+              C[i][j] += f16vec4(a, a, a, a)*B[0][j];
+              a = unpackFloat2x16(floatBitsToUint(temp.x)).y;
+              C[i][j] += f16vec4(a, a, a, a)*B[1][j];
+              a = unpackFloat2x16(floatBitsToUint(temp.y)).x;
+              C[i][j] += f16vec4(a, a, a, a)*B[2][j];
+              a = unpackFloat2x16(floatBitsToUint(temp.y)).y;
+              C[i][j] += f16vec4(a, a, a, a)*B[3][j];
+            }
+        }
+    }
+
     [[unroll]] for (uint i = 0; i < C_ROWS; ++i) {
         [[unroll]] for (uint j = 0; j < C_COLS; j+=2) {
             uint gi = gID.y * TILE_M + laneId.y + i*sY;
@@ -95,7 +145,8 @@ void main()
             temp.y = packFloat2x16(f16vec2(C[i][j].zw));
             temp.z = packFloat2x16(f16vec2(C[i][j+1].xy));
             temp.w = packFloat2x16(f16vec2(C[i][j+1].zw));
-            outputO.x[gi * strideC/8 + gj/2] = temp;
+            uint offset = gi * strideC/8 + gj/2;
+            outputO.x[offset] = temp;
         }
     }
 }

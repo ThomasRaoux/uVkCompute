@@ -150,6 +150,9 @@ absl::StatusOr<std::unique_ptr<Device>> Driver::CreateDevice(
   queue_create_info.queueCount = 1;
   queue_create_info.pQueuePriorities = &queue_priority;
 
+  VkPhysicalDeviceFeatures physicalfeatures = {0};
+  physicalfeatures.robustBufferAccess = VK_FALSE;
+
   VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_create_info.pNext = nullptr;
@@ -160,7 +163,7 @@ absl::StatusOr<std::unique_ptr<Device>> Driver::CreateDevice(
   device_create_info.ppEnabledLayerNames = nullptr;
   device_create_info.enabledExtensionCount = 0;
   device_create_info.ppEnabledExtensionNames = nullptr;
-  device_create_info.pEnabledFeatures = nullptr;
+  device_create_info.pEnabledFeatures = &physicalfeatures;
 
   VkDevice device;
   VK_RETURN_IF_ERROR(symbols_.vkCreateDevice(physical_device.handle,

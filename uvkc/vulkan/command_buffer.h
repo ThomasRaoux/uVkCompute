@@ -89,6 +89,8 @@ class CommandBuffer {
       const Pipeline &pipeline,
       absl::Span<const BoundDescriptorSet> bound_descriptor_sets);
 
+  void BindPipeline(const Pipeline &pipeline);
+  
   // Records a command to reset the given timestamp |query_pool|.
   void ResetQueryPool(const TimestampQueryPool &query_pool);
 
