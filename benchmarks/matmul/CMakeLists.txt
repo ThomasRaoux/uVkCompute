@@ -18,7 +18,7 @@ uvkc_glsl_shader_permutation(
   SRC
     "matmul_tiled.glsl"
   PERMUTATION
-    "TILE_M=[2|4|8|16|32]"
+    "TILE_M=[1|2|3|4|5|6|7|8|16|32]"
     "TILE_N=[64|128]"
     "TILE_K=[4|8]"
 )
@@ -29,10 +29,11 @@ uvkc_glsl_shader_permutation(
   SRC
     "matmul_tiled_fp16.glsl"
   PERMUTATION
-    "TILE_M=[2|4|8|16|32]"
+    "TILE_M=[2|4|6|8|16|32]"
     "TILE_N=[64|128]"
     "TILE_K=[4|8]"
     "TEXTURE=[1|0]"
+    "UNALIGNED=[1|0]"
 )
 
 uvkc_cc_binary(

@@ -50,11 +50,18 @@ void main()
           [[unroll]] for (uint i = 0; i < TILE_K; ++i) {
             uint gj = gID.x * TILE_N/4 + laneId.x*2 + j*sX;
             uint gk = k+i;
+            vec4 temp;
+
           #if (TEXTURE == 1)
-            vec4 temp = texelFetch(texB, ivec2(gj/2, gk), 0);
+            temp = texelFetch(texB, ivec2(gj/2, gk), 0);
           #else
-            vec4 temp = inputB.x[coordToOffset(gk, gj/2, strideB/8)];
+            uint offset = coordToOffset(gk, gj/2, strideB/8);
+            offset = (gk < K && gj < N/4) ? offset : 0;
+            temp = inputB.x[offset];
           #endif
+          #if (UNALIGNED == 1)  
+            temp = (gk < K && gj < N/4) ? temp : vec4(0.f, 0.f, 0.f, 0.f);
+          #endif  
             B[i][j].x = unpackFloat2x16(floatBitsToUint(temp.x)).x;
             B[i][j].y = unpackFloat2x16(floatBitsToUint(temp.x)).y;
             B[i][j].z = unpackFloat2x16(floatBitsToUint(temp.y)).x;
@@ -70,7 +77,15 @@ void main()
           uint gi = gID.y * TILE_M + laneId.y + i*sY;
           uint gk = k/4;
           [[unroll]] for (uint kk = 0; kk < TILE_K/4; kk++) {
-            vec2 temp = inputA.x[coordToOffset(gi, gk+kk, strideA/4)];
+          vec2 temp;
+          uint offset = coordToOffset(gi, gk+kk, strideA/4);
+        #if (UNALIGNED == 1)  
+          offset = (gi < M && gk < K/4) ? offset : 0;
+        #endif   
+          temp = inputA.x[offset];
+        #if (UNALIGNED == 1)  
+          temp = (gi < M && gk < K/4) ? temp : vec2(0.f, 0.f);
+        #endif      
             float16_t a;
             [[unroll]] for (uint j = 0; j < C_COLS; ++j) {
               a = unpackFloat2x16(floatBitsToUint(temp.x)).x;
@@ -95,7 +110,13 @@ void main()
             temp.y = packFloat2x16(f16vec2(C[i][j].zw));
             temp.z = packFloat2x16(f16vec2(C[i][j+1].xy));
             temp.w = packFloat2x16(f16vec2(C[i][j+1].zw));
-            outputO.x[gi * strideC/8 + gj/2] = temp;
+          #if (UNALIGNED == 1)
+            if(gi < M && gj < N/4) {
+          #endif
+              outputO.x[gi * strideC/8 + gj/2] = temp;
+          #if (UNALIGNED == 1)              
+            }
+          #endif
         }
     }
 }
